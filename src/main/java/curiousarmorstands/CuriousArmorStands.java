@@ -11,6 +11,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.util.ActionResultType;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
+import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -44,6 +45,17 @@ public class CuriousArmorStands {
 
     @Mod.EventBusSubscriber(modid = CuriousArmorStands.MODID)
     public static class Events {
+
+        @SubscribeEvent
+        public static void onEntityTick(LivingEvent.LivingUpdateEvent event) {
+            if (event.getEntityLiving() instanceof ArmorStandEntity) {
+                CuriosApi.getCuriosHelper().getCuriosHandler((ArmorStandEntity) event.getEntity()).ifPresent(handler -> {
+                    if (handler instanceof CurioInventoryCapability.CurioInventoryWrapper) {
+                        ((CurioInventoryCapability.CurioInventoryWrapper) handler).dropInvalidStacks();
+                    }
+                });
+            }
+        }
 
         @SubscribeEvent
         public static void attachEntitiesCapabilities(AttachCapabilitiesEvent<Entity> event) {

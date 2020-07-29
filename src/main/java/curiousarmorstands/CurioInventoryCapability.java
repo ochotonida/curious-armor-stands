@@ -41,8 +41,7 @@ public class CurioInventoryCapability {
             if (!wearer.getEntityWorld().isRemote()) {
                 curios.clear();
                 invalidStacks.clear();
-                CuriosApi.getSlotHelper().createSlots().forEach((slotType, stacksHandler) ->
-                        curios.put(slotType.getIdentifier(), stacksHandler));
+                CuriosApi.getSlotHelper().createSlots().forEach((slotType, stacksHandler) -> curios.put(slotType.getIdentifier(), stacksHandler));
             }
         }
 
@@ -106,7 +105,9 @@ public class CurioInventoryCapability {
         }
 
         @Override
-        public void handleInvalidStacks() {
+        public void handleInvalidStacks() { }
+
+        public void dropInvalidStacks() {
             if (wearer != null && !invalidStacks.isEmpty()) {
                 invalidStacks.forEach(drop -> dropStack(wearer, drop));
                 invalidStacks = NonNullList.create();
