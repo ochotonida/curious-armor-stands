@@ -7,8 +7,8 @@ modId="curious_armor_stands"
 version="1.16.1-1.0.0"
 displayName="Curious Armor Stands"
 displayURL="https://www.curseforge.com/minecraft/mc-mods/curious-armor-stands"
-# todo logoFile="examplemod.png" A file name (in the root of the mod JAR) containing a logo for display
-description='''Allows armor stands to wear curios'''
+logoFile="logo.png"
+description='''Allows armor stands to equip and display curios'''
 
 [[dependencies.curious_armor_stands]]
     modId="forge"
