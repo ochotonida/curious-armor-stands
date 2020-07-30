@@ -6,10 +6,12 @@ import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.item.ArmorStandEntity;
+import net.minecraft.inventory.EquipmentSlotType;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.util.ActionResultType;
+import net.minecraft.util.math.vector.Vector3d;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.living.LivingEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
@@ -23,7 +25,6 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 @Mod("curious_armor_stands")
 @SuppressWarnings("unused")
@@ -102,7 +103,7 @@ public class CuriousArmorStands {
                         event.setCanceled(true);
                     }
                 }));
-            } else {
+            } else if (canUnEquipCurio(event.getLocalPos(), entity)){
                 CuriosApi.getCuriosHelper().getCuriosHandler(entity).ifPresent(handler -> {
                     Map<String, ICurioStacksHandler> curios = handler.getCurios();
                     for (Map.Entry<String, ICurioStacksHandler> entry : curios.entrySet()) {
@@ -128,12 +129,21 @@ public class CuriousArmorStands {
 
         private static void enableArmorStandArms(ArmorStandEntity entity, Item curioItem) {
             if (CuriosApi.getCuriosHelper().getCurioTags(curioItem).contains("hands") || CuriosApi.getCuriosHelper().getCurioTags(curioItem).contains("ring") || CuriosApi.getCuriosHelper().getCurioTags(curioItem).contains("bracelet")) {
-                CompoundNBT compoundNBT = entity.writeWithoutTypeId(new CompoundNBT());
-                UUID uuid = entity.getUniqueID();
-                compoundNBT.putBoolean("ShowArms", true);
-                entity.setUniqueId(uuid);
-                entity.read(compoundNBT);
+                CompoundNBT nbt = entity.writeWithoutTypeId(new CompoundNBT());
+                nbt.putBoolean("ShowArms", true);
+                entity.read(nbt);
             }
+        }
+
+        private static boolean canUnEquipCurio(Vector3d localPos, ArmorStandEntity entity) {
+            boolean isSmall = entity.isSmall();
+            double y = isSmall ? localPos.y * 2 : localPos.y;
+            return !(entity.hasItemInSlot(EquipmentSlotType.FEET) && y >= 0.1 && y < 0.1 + (isSmall ? 0.8 : 0.45))
+                    && !(entity.hasItemInSlot(EquipmentSlotType.CHEST) && y >= 0.9 + (isSmall ? 0.3 : 0) && y < 0.9 + (isSmall ? 1 : 0.7))
+                    && !(entity.hasItemInSlot(EquipmentSlotType.LEGS) && y >= 0.4 && y < 0.4 + (isSmall ? 1.0 : 0.8))
+                    && !(entity.hasItemInSlot(EquipmentSlotType.HEAD) && y >= 1.6)
+                    && !entity.hasItemInSlot(EquipmentSlotType.MAINHAND)
+                    && !entity.hasItemInSlot(EquipmentSlotType.OFFHAND);
         }
     }
 }
