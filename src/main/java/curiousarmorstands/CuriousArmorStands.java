@@ -85,7 +85,7 @@ public class CuriousArmorStands {
                                 ItemStack present = stackHandler.getStackInSlot(i);
                                 Set<String> tags = CuriosApi.getCuriosHelper().getCurioTags(stack.getItem());
                                 String id = entry.getKey();
-                                if (present.isEmpty() && (tags.contains(id) || tags.contains("curio")) && curio.canEquip(id, entity) && curio.canRender(id, i, entity)) {
+                                if (present.isEmpty() && (tags.contains(id) || tags.contains("curio")) && curio.canEquip(id, entity)) {
                                     stackHandler.setStackInSlot(i, stack.copy());
                                     curio.playRightClickEquipSound(entity);
                                     enableArmorStandArms(entity, item);
