@@ -84,15 +84,11 @@ public class CuriousArmorStands {
         }
 
         public static void equipItem(ArmorStandEntity armorStand, ItemStack stackInHand, PlayerInteractEvent.EntityInteractSpecific event) {
-            System.out.println("a");
             CuriosApi.getCuriosHelper().getCurio(stackInHand).ifPresent(curio -> CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(handler -> {
                 if (!armorStand.world.isRemote) {
-                    System.out.println("b");
                     handler.getStacksHandler("armor_stand_curio").ifPresent(stacksHandler -> {
-                        System.out.println("c");
                         IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
                         for (int slot = 0; slot < cosmeticStacks.getSlots(); slot++) {
-                            System.out.println("d");
                             if (cosmeticStacks.getStackInSlot(slot).isEmpty() && curio.canEquip("armor_stand_curio", armorStand)) {
                                 cosmeticStacks.setStackInSlot(slot, stackInHand.copy());
                                 curio.playRightClickEquipSound(armorStand);
