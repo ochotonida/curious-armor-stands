@@ -63,7 +63,7 @@ public class CuriousArmorStands {
 
         @SubscribeEvent
         public static void entityJoinWorld(EntityJoinWorldEvent event) {
-            if (event.getEntity() instanceof LivingEntity && !(event.getEntity() instanceof ArmorStandEntity)) {
+            if (!event.getWorld().isRemote && event.getEntity() instanceof LivingEntity && !(event.getEntity() instanceof ArmorStandEntity)) {
                 CuriosApi.getSlotHelper().lockSlotType("armor_stand_curio", (LivingEntity) event.getEntity());
             }
         }
