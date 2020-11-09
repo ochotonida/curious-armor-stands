@@ -64,10 +64,11 @@ public class CuriosLayer<M extends EntityModel<ArmorStandEntity>> extends LayerR
             matrixStack.scale(0.25F, 0.25F, 0.25F);
             matrixStack.translate((stacks.size() - 1) / 2F, -4, 0);
             matrixStack.rotate(Vector3f.XP.rotationDegrees(180));
+            matrixStack.rotate(Vector3f.YP.rotationDegrees(180));
 
             for (int index = stacks.size() - 1; index >= 0; index--) {
                 Minecraft.getInstance().getItemRenderer().renderItem(stacks.get(index), ItemCameraTransforms.TransformType.FIXED, light, OverlayTexture.NO_OVERLAY, matrixStack, buffer);
-                matrixStack.translate(-1, 0, 0);
+                matrixStack.translate(1, 0, 0);
             }
         }
         matrixStack.pop();
