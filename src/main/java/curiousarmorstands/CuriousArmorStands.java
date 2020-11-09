@@ -5,6 +5,7 @@ import net.minecraft.client.renderer.entity.ArmorStandRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.item.ArmorStandEntity;
 import net.minecraft.inventory.EquipmentSlotType;
 import net.minecraft.item.Item;
@@ -14,18 +15,18 @@ import net.minecraft.util.ActionResultType;
 import net.minecraft.util.math.vector.Vector3d;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.entity.living.LivingEvent;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.eventbus.api.EventPriority;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.InterModComms;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
+import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.CuriosCapability;
-import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
+import top.theillusivec4.curios.api.SlotTypeMessage;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
-
-import java.util.Map;
-import java.util.Set;
 
 @Mod("curious_armor_stands")
 @SuppressWarnings("unused")
@@ -34,7 +35,7 @@ public class CuriousArmorStands {
     public static final String MODID = "curious_armor_stands";
 
     @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
-    public static class RegistryEvents {
+    public static class ModEvents {
 
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
@@ -43,26 +44,27 @@ public class CuriousArmorStands {
                 ((ArmorStandRenderer) renderer).addLayer(new CuriosLayer<>((ArmorStandRenderer) renderer));
             }
         }
+
+        @SubscribeEvent
+        public static void enqueueIMC(final InterModEnqueueEvent event) {
+            InterModComms.sendTo("curios", SlotTypeMessage.REGISTER_TYPE, () -> new SlotTypeMessage.Builder("armor_stand_curio").cosmetic().size(8).build());
+        }
     }
 
     @Mod.EventBusSubscriber(modid = CuriousArmorStands.MODID)
     public static class Events {
 
         @SubscribeEvent
-        public static void onEntityTick(LivingEvent.LivingUpdateEvent event) {
-            if (event.getEntityLiving() instanceof ArmorStandEntity) {
-                CuriosApi.getCuriosHelper().getCuriosHandler((ArmorStandEntity) event.getEntity()).ifPresent(handler -> {
-                    if (handler instanceof CurioInventoryCapability.CurioInventoryWrapper) {
-                        ((CurioInventoryCapability.CurioInventoryWrapper) handler).dropInvalidStacks();
-                    }
-                });
+        public static void attachCapabilities(AttachCapabilitiesEvent<Entity> event) {
+            if (event.getObject() instanceof ArmorStandEntity) {
+                event.addCapability(CuriosCapability.ID_INVENTORY, CurioInventoryCapability.createProvider((ArmorStandEntity) event.getObject()));
             }
         }
 
         @SubscribeEvent
-        public static void attachEntitiesCapabilities(AttachCapabilitiesEvent<Entity> event) {
-            if (event.getObject() instanceof ArmorStandEntity) {
-                event.addCapability(CuriosCapability.ID_INVENTORY, CurioInventoryCapability.createProvider((ArmorStandEntity) event.getObject()));
+        public static void entityJoinWorld(EntityJoinWorldEvent event) {
+            if (event.getEntity() instanceof LivingEntity && !(event.getEntity() instanceof ArmorStandEntity)) {
+                CuriosApi.getSlotHelper().lockSlotType("armor_stand_curio", (LivingEntity) event.getEntity());
             }
         }
 
@@ -71,61 +73,63 @@ public class CuriousArmorStands {
             if (!(event.getTarget() instanceof ArmorStandEntity)) {
                 return;
             }
-            ArmorStandEntity entity = (ArmorStandEntity) event.getTarget();
-            ItemStack stack = event.getItemStack();
+            ArmorStandEntity armorStand = (ArmorStandEntity) event.getTarget();
+            ItemStack stackInHand = event.getItemStack();
 
-            if (!stack.isEmpty()) {
-                Item item = stack.getItem();
-                CuriosApi.getCuriosHelper().getCurio(stack).ifPresent(curio -> CuriosApi.getCuriosHelper().getCuriosHandler(entity).ifPresent(handler -> {
-                    if (!entity.world.isRemote) {
-                        Map<String, ICurioStacksHandler> curios = handler.getCurios();
-                        for (Map.Entry<String, ICurioStacksHandler> entry : curios.entrySet()) {
-                            IDynamicStackHandler stackHandler = entry.getValue().getCosmeticStacks();
-                            for (int i = 0; i < stackHandler.getSlots(); i++) {
-                                ItemStack present = stackHandler.getStackInSlot(i);
-                                Set<String> tags = CuriosApi.getCuriosHelper().getCurioTags(stack.getItem());
-                                String id = entry.getKey();
-                                if (present.isEmpty() && (tags.contains(id) || tags.contains("curio")) && curio.canEquip(id, entity)) {
-                                    stackHandler.setStackInSlot(i, stack.copy());
-                                    curio.playRightClickEquipSound(entity);
-                                    enableArmorStandArms(entity, item);
-                                    if (!event.getPlayer().isCreative()) {
-                                        int count = stack.getCount();
-                                        stack.shrink(count);
-                                    }
-                                    event.setCancellationResult(ActionResultType.SUCCESS);
-                                    event.setCanceled(true);
-                                    return;
-                                }
-                            }
-                        }
-                    } else {
-                        event.setCancellationResult(ActionResultType.CONSUME);
-                        event.setCanceled(true);
-                    }
-                }));
-            } else if (canUnEquipCurio(event.getLocalPos(), entity)){
-                CuriosApi.getCuriosHelper().getCuriosHandler(entity).ifPresent(handler -> {
-                    Map<String, ICurioStacksHandler> curios = handler.getCurios();
-                    for (Map.Entry<String, ICurioStacksHandler> entry : curios.entrySet()) {
-                        IDynamicStackHandler stackHandler = entry.getValue().getCosmeticStacks();
-                        for (int i = 0; i < stackHandler.getSlots(); i++) {
-                            ItemStack present = stackHandler.getStackInSlot(i);
-                            Set<String> tags = CuriosApi.getCuriosHelper().getCurioTags(stack.getItem());
-                            String id = entry.getKey();
-                            if (!present.isEmpty()) {
-                                if (!entity.world.isRemote()) {
-                                    event.getPlayer().setHeldItem(event.getHand(), present);
-                                    stackHandler.setStackInSlot(i, ItemStack.EMPTY);
+            if (!stackInHand.isEmpty()) {
+                equipItem(armorStand, stackInHand, event);
+            } else if (canUnEquipCurio(event.getLocalPos(), armorStand)){
+                unequipItem(armorStand, event);
+            }
+        }
+
+        public static void equipItem(ArmorStandEntity armorStand, ItemStack stackInHand, PlayerInteractEvent.EntityInteractSpecific event) {
+            System.out.println("a");
+            CuriosApi.getCuriosHelper().getCurio(stackInHand).ifPresent(curio -> CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(handler -> {
+                if (!armorStand.world.isRemote) {
+                    System.out.println("b");
+                    handler.getStacksHandler("armor_stand_curio").ifPresent(stacksHandler -> {
+                        System.out.println("c");
+                        IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
+                        for (int slot = 0; slot < cosmeticStacks.getSlots(); slot++) {
+                            System.out.println("d");
+                            if (cosmeticStacks.getStackInSlot(slot).isEmpty() && curio.canEquip("armor_stand_curio", armorStand)) {
+                                cosmeticStacks.setStackInSlot(slot, stackInHand.copy());
+                                curio.playRightClickEquipSound(armorStand);
+                                enableArmorStandArms(armorStand, stackInHand.getItem());
+                                if (!event.getPlayer().isCreative()) {
+                                    int count = stackInHand.getCount();
+                                    stackInHand.shrink(count);
                                 }
                                 event.setCancellationResult(ActionResultType.SUCCESS);
                                 event.setCanceled(true);
                                 return;
                             }
                         }
+                    });
+                } else {
+                    event.setCancellationResult(ActionResultType.CONSUME);
+                    event.setCanceled(true);
+                }
+            }));
+        }
+
+        public static void unequipItem(ArmorStandEntity armorStand, PlayerInteractEvent.EntityInteractSpecific event) {
+            CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(handler -> handler.getStacksHandler("armor_stand_curio").ifPresent(stacksHandler -> {
+                IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
+                for (int slot = cosmeticStacks.getSlots() - 1; slot >= 0; slot--) {
+                    ItemStack stackInSlot = cosmeticStacks.getStackInSlot(slot);
+                    if (!stackInSlot.isEmpty()) {
+                        if (!armorStand.world.isRemote()) {
+                            event.getPlayer().setHeldItem(event.getHand(), stackInSlot);
+                            cosmeticStacks.setStackInSlot(slot, ItemStack.EMPTY);
+                        }
+                        event.setCancellationResult(ActionResultType.SUCCESS);
+                        event.setCanceled(true);
+                        return;
                     }
-                });
-            }
+                }
+            }));
         }
 
         private static void enableArmorStandArms(ArmorStandEntity entity, Item curioItem) {

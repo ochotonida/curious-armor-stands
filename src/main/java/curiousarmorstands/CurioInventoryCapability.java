@@ -6,6 +6,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.INBT;
 import net.minecraft.util.Direction;
 import net.minecraft.util.NonNullList;
+import net.minecraft.util.Tuple;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.common.capabilities.ICapabilitySerializable;
@@ -41,13 +42,32 @@ public class CurioInventoryCapability {
             if (!wearer.getEntityWorld().isRemote()) {
                 curios.clear();
                 invalidStacks.clear();
-                CuriosApi.getSlotHelper().createSlots().forEach((slotType, stacksHandler) -> curios.put(slotType.getIdentifier(), stacksHandler));
+                CuriosApi.getSlotHelper().createSlots().forEach(
+                        (slotType, stacksHandler) -> curios.put(slotType.getIdentifier(), stacksHandler)
+                );
             }
         }
 
         @Override
         public int getSlots() {
-            return curios.values().stream().mapToInt(ICurioStacksHandler::getSlots).sum();
+            int slots = 0;
+
+            for (ICurioStacksHandler stacks : curios.values()) {
+                slots += stacks.getSlots();
+            }
+            return slots;
+        }
+
+        @Override
+        public int getVisibleSlots() {
+            int slots = 0;
+
+            for (ICurioStacksHandler stacks : curios.values()) {
+                if (stacks.isVisible()) {
+                    slots += stacks.getSlots();
+                }
+            }
+            return slots;
         }
 
         @Override
@@ -75,6 +95,9 @@ public class CurioInventoryCapability {
 
         @Override
         public void lockSlotType(String identifier) { }
+
+        @Override
+        public void processSlots() { }
 
         @Override
         public void growSlotType(String identifier, int amount) {
@@ -105,9 +128,7 @@ public class CurioInventoryCapability {
         }
 
         @Override
-        public void handleInvalidStacks() { }
-
-        public void dropInvalidStacks() {
+        public void handleInvalidStacks() {
             if (wearer != null && !invalidStacks.isEmpty()) {
                 invalidStacks.forEach(drop -> dropStack(wearer, drop));
                 invalidStacks = NonNullList.create();
@@ -123,8 +144,8 @@ public class CurioInventoryCapability {
                     drops.add(stackHandler.getStackInSlot(i));
 
                     if (!stack.isEmpty()) {
-                        wearer.func_233645_dx_().func_233785_a_(CuriosApi.getCuriosHelper().getAttributeModifiers(identifier, stack));
-                        int index = i;
+                        wearer.getAttributeManager().removeModifiers(CuriosApi.getCuriosHelper().getAttributeModifiers(identifier, stack));
+                        final int index = i;
                         CuriosApi.getCuriosHelper().getCurio(stack).ifPresent(curio -> curio.onUnequip(identifier, index, wearer));
                     }
                     stackHandler.setStackInSlot(i, ItemStack.EMPTY);
@@ -139,6 +160,19 @@ public class CurioInventoryCapability {
                 entity.world.addEntity(itemEntity);
             }
         }
+
+        @Override
+        public int getFortuneBonus() {
+            return 0;
+        }
+
+        @Override
+        public int getLootingBonus() {
+            return 0;
+        }
+
+        @Override
+        public void setEnchantmentBonuses(Tuple<Integer, Integer> tuple) { }
     }
 
     public static class Provider implements ICapabilitySerializable<INBT> {
