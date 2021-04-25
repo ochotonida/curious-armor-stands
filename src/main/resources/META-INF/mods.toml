@@ -5,11 +5,11 @@ license="LGPL-3.0"
 
 [[mods]]
 modId="curious_armor_stands"
-version="1.16.3-2.0.2"
+version="1.16.5-2.1.0"
 displayName="Curious Armor Stands"
 displayURL="https://www.curseforge.com/minecraft/mc-mods/curious-armor-stands"
 logoFile="logo.png"
-description='''Allows armor stands to equip and display curios'''
+description='''Allows armor stands to display curios'''
 
 [[dependencies.curious_armor_stands]]
     modId="forge"
@@ -28,6 +28,6 @@ description='''Allows armor stands to equip and display curios'''
 [[dependencies.curious_armor_stands]]
     modId="curios"
     mandatory=true
-    versionRange="[1.16.3-4.0.2.0,)"
+    versionRange="[1.16.5-4.0.5.0,)"
     ordering="AFTER"
     side="BOTH"
