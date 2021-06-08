@@ -5,6 +5,7 @@ import net.minecraft.client.renderer.entity.ArmorStandRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.item.ArmorStandEntity;
 import net.minecraft.inventory.EquipmentSlotType;
 import net.minecraft.item.Item;
@@ -14,6 +15,7 @@ import net.minecraft.util.ActionResultType;
 import net.minecraft.util.math.vector.Vector3d;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.InterModComms;
@@ -50,12 +52,19 @@ public class CuriousArmorStands {
 
         @SubscribeEvent
         public static void enqueueIMC(final InterModEnqueueEvent event) {
-            InterModComms.sendTo("curios", SlotTypeMessage.REGISTER_TYPE, () -> new SlotTypeMessage.Builder(SLOT).cosmetic().size(8).hide().build());
+            InterModComms.sendTo("curios", SlotTypeMessage.REGISTER_TYPE, () -> new SlotTypeMessage.Builder(SLOT).cosmetic().size(0).build());
         }
     }
 
     @Mod.EventBusSubscriber(modid = CuriousArmorStands.MODID)
     public static class Events {
+
+        @SubscribeEvent
+        public static void entityJoinWorld(EntityJoinWorldEvent event) {
+            if (!event.getWorld().isRemote && event.getEntity() instanceof ArmorStandEntity) {
+                CuriosApi.getSlotHelper().setSlotsForType(SLOT, (LivingEntity) event.getEntity(), 8);
+            }
+        }
 
         @SubscribeEvent
         public static void attachCapabilities(AttachCapabilitiesEvent<Entity> event) {
