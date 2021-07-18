@@ -12,6 +12,7 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.util.ActionResultType;
+import net.minecraft.util.SoundEvents;
 import net.minecraft.util.math.vector.Vector3d;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
@@ -25,7 +26,10 @@ import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.CuriosCapability;
 import top.theillusivec4.curios.api.SlotTypeMessage;
+import top.theillusivec4.curios.api.type.capability.ICurio;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
+
+import java.util.Optional;
 
 @Mod(CuriousArmorStands.MODID)
 @SuppressWarnings("unused")
@@ -89,31 +93,55 @@ public class CuriousArmorStands {
         }
 
         public static void equipItem(ArmorStandEntity armorStand, ItemStack stackInHand, PlayerInteractEvent.EntityInteractSpecific event) {
-            CuriosApi.getCuriosHelper().getCurio(stackInHand).ifPresent(curio -> CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(handler -> {
-                if (!armorStand.world.isRemote) {
-                    handler.getStacksHandler(SLOT).ifPresent(stacksHandler -> {
-                        IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
-                        for (int slot = 0; slot < cosmeticStacks.getSlots(); slot++) {
-                            if (cosmeticStacks.getStackInSlot(slot).isEmpty() && curio.canEquip(SLOT, armorStand)) {
-                                cosmeticStacks.setStackInSlot(slot, stackInHand.copy());
-                                // noinspection deprecation
-                                curio.playRightClickEquipSound(armorStand);
-                                enableArmorStandArms(armorStand, stackInHand.getItem());
-                                if (!event.getPlayer().isCreative()) {
-                                    int count = stackInHand.getCount();
-                                    stackInHand.shrink(count);
+            if (CuriosApi.getCuriosHelper().getCurioTags(stackInHand.getItem()).isEmpty()) {
+                return;
+            }
+
+            if (armorStand.world.isRemote) {
+                event.setCancellationResult(ActionResultType.SUCCESS);
+                event.setCanceled(true);
+                return;
+            }
+
+            CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(
+                    handler -> handler.getStacksHandler(SLOT).ifPresent(
+                            stacksHandler -> {
+                                IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
+                                Optional<ICurio> curio = CuriosApi.getCuriosHelper().getCurio(stackInHand).resolve();
+
+                                for (int slot = 0; slot < cosmeticStacks.getSlots(); slot++) {
+                                    if (cosmeticStacks.getStackInSlot(slot).isEmpty() && (!curio.isPresent() || curio.get().canEquip(SLOT, armorStand))) {
+                                        cosmeticStacks.setStackInSlot(slot, stackInHand.copy());
+
+                                        if (curio.isPresent()) {
+                                            // noinspection deprecation
+                                            curio.get().playRightClickEquipSound(armorStand);
+                                        } else {
+                                            armorStand.world.playSound(
+                                                    null,
+                                                    armorStand.getPosition(),
+                                                    SoundEvents.ITEM_ARMOR_EQUIP_GENERIC,
+                                                    armorStand.getSoundCategory(),
+                                                    1,
+                                                    1
+                                            );
+                                        }
+
+                                        enableArmorStandArms(armorStand, stackInHand.getItem());
+
+                                        if (!event.getPlayer().isCreative()) {
+                                            int count = stackInHand.getCount();
+                                            stackInHand.shrink(count);
+                                        }
+
+                                        event.setCancellationResult(ActionResultType.SUCCESS);
+                                        event.setCanceled(true);
+                                        return;
+                                    }
                                 }
-                                event.setCancellationResult(ActionResultType.SUCCESS);
-                                event.setCanceled(true);
-                                return;
                             }
-                        }
-                    });
-                } else {
-                    event.setCancellationResult(ActionResultType.CONSUME);
-                    event.setCanceled(true);
-                }
-            }));
+                    )
+            );
         }
 
         public static void unequipItem(ArmorStandEntity armorStand, PlayerInteractEvent.EntityInteractSpecific event) {
