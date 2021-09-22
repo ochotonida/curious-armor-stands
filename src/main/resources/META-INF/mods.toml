@@ -14,7 +14,7 @@ description='''Allows armor stands to display curios'''
 [[dependencies.curious_armor_stands]]
     modId="forge"
     mandatory=true
-    versionRange="[37.0.20,)"
+    versionRange="[37.0.60,)"
     ordering="NONE"
     side="BOTH"
 
