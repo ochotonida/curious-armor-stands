@@ -3,33 +3,31 @@ package curiousarmorstands;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.ArmorStandRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderer;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.item.ArmorStandEntity;
-import net.minecraft.inventory.EquipmentSlotType;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.nbt.CompoundNBT;
-import net.minecraft.util.ActionResultType;
-import net.minecraft.util.SoundEvents;
-import net.minecraft.util.math.vector.Vector3d;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.decoration.ArmorStand;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.client.event.EntityRenderersEvent;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.InterModComms;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
-import top.theillusivec4.curios.api.CuriosApi;
-import top.theillusivec4.curios.api.CuriosCapability;
-import top.theillusivec4.curios.api.SlotTypeMessage;
+import top.theillusivec4.curios.api.*;
 import top.theillusivec4.curios.api.type.capability.ICurio;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
+import top.theillusivec4.curios.client.render.CuriosLayer;
 
 import java.util.Optional;
+import java.util.Set;
 
 @Mod(CuriousArmorStands.MODID)
 @SuppressWarnings("unused")
@@ -39,24 +37,30 @@ public class CuriousArmorStands {
 
     public static final String SLOT = "armor_stand_curio";
 
-    @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
-    public static class ClientModEvents {
-
-        @SubscribeEvent
-        public static void onClientSetup(FMLClientSetupEvent event) {
-            EntityRenderer<?> renderer = Minecraft.getInstance().getRenderManager().renderers.get(EntityType.ARMOR_STAND);
-            if (renderer instanceof ArmorStandRenderer) {
-                ((ArmorStandRenderer) renderer).addLayer(new CuriosLayer<>((ArmorStandRenderer) renderer));
-            }
-        }
-    }
-
     @Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
     public static class ModEvents {
 
         @SubscribeEvent
-        public static void enqueueIMC(final InterModEnqueueEvent event) {
-            InterModComms.sendTo("curios", SlotTypeMessage.REGISTER_TYPE, () -> new SlotTypeMessage.Builder(SLOT).cosmetic().size(0).build());
+        public static void enqueueIMC(InterModEnqueueEvent event) {
+            InterModComms.sendTo("curios", SlotTypeMessage.REGISTER_TYPE,
+                    () -> new SlotTypeMessage.Builder(SLOT)
+                            .cosmetic()
+                            .size(0)
+                            .build()
+            );
+        }
+    }
+
+    @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+    public static class ClientModEvents {
+
+        @SubscribeEvent
+        public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
+            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(EntityType.ARMOR_STAND);
+            if (renderer instanceof ArmorStandRenderer armorStandRenderer) {
+                armorStandRenderer.addLayer(new CuriosLayer<>(armorStandRenderer));
+                armorStandRenderer.addLayer(new ArmorStandCuriosLayer<>(armorStandRenderer));
+            }
         }
     }
 
@@ -65,40 +69,38 @@ public class CuriousArmorStands {
 
         @SubscribeEvent
         public static void entityJoinWorld(EntityJoinWorldEvent event) {
-            if (!event.getWorld().isRemote && event.getEntity() instanceof ArmorStandEntity) {
-                CuriosApi.getSlotHelper().setSlotsForType(SLOT, (LivingEntity) event.getEntity(), 8);
+            if (!event.getWorld().isClientSide() && event.getEntity() instanceof ArmorStand armorStand) {
+                CuriosApi.getSlotHelper().setSlotsForType(SLOT, armorStand, 8);
             }
         }
 
         @SubscribeEvent
         public static void attachCapabilities(AttachCapabilitiesEvent<Entity> event) {
-            if (event.getObject() instanceof ArmorStandEntity) {
-                event.addCapability(CuriosCapability.ID_INVENTORY, CurioInventoryCapability.createProvider((ArmorStandEntity) event.getObject()));
+            if (event.getObject() instanceof ArmorStand armorStand) {
+                event.addCapability(CuriosCapability.ID_INVENTORY, CurioInventoryCapability.createProvider(armorStand));
             }
         }
 
         @SubscribeEvent
         public static void onEntityInteract(PlayerInteractEvent.EntityInteractSpecific event) {
-            if (!(event.getTarget() instanceof ArmorStandEntity)) {
-                return;
-            }
-            ArmorStandEntity armorStand = (ArmorStandEntity) event.getTarget();
-            ItemStack stackInHand = event.getItemStack();
+            if (event.getTarget() instanceof ArmorStand armorStand) {
+                ItemStack stack = event.getItemStack();
 
-            if (!stackInHand.isEmpty()) {
-                equipItem(armorStand, stackInHand, event);
-            } else if (canUnequipCurio(event.getLocalPos(), armorStand)){
-                unequipItem(armorStand, event);
+                if (!stack.isEmpty()) {
+                    equipItem(armorStand, stack, event);
+                } else if (canUnequipCurio(event.getLocalPos(), armorStand)) {
+                    unequipItem(armorStand, event);
+                }
             }
         }
 
-        public static void equipItem(ArmorStandEntity armorStand, ItemStack stackInHand, PlayerInteractEvent.EntityInteractSpecific event) {
-            if (CuriosApi.getCuriosHelper().getCurioTags(stackInHand.getItem()).isEmpty()) {
+        public static void equipItem(ArmorStand armorStand, ItemStack stack, PlayerInteractEvent.EntityInteractSpecific event) {
+            if (CuriosApi.getCuriosHelper().getCurioTags(stack.getItem()).isEmpty()) {
                 return;
             }
 
-            if (armorStand.world.isRemote) {
-                event.setCancellationResult(ActionResultType.SUCCESS);
+            if (armorStand.level.isClientSide()) {
+                event.setCancellationResult(InteractionResult.SUCCESS);
                 event.setCanceled(true);
                 return;
             }
@@ -106,35 +108,36 @@ public class CuriousArmorStands {
             CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(
                     handler -> handler.getStacksHandler(SLOT).ifPresent(
                             stacksHandler -> {
-                                IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
-                                Optional<ICurio> curio = CuriosApi.getCuriosHelper().getCurio(stackInHand).resolve();
+                                IDynamicStackHandler cosmetics = stacksHandler.getCosmeticStacks();
+                                Optional<ICurio> curio = CuriosApi.getCuriosHelper().getCurio(stack).resolve();
 
-                                for (int slot = 0; slot < cosmeticStacks.getSlots(); slot++) {
-                                    if (cosmeticStacks.getStackInSlot(slot).isEmpty() && (!curio.isPresent() || curio.get().canEquip(SLOT, armorStand))) {
-                                        cosmeticStacks.setStackInSlot(slot, stackInHand.copy());
+                                for (int slot = 0; slot < cosmetics.getSlots(); slot++) {
+                                    SlotContext slotContext = new SlotContext(SLOT, armorStand, slot, true, true);
+                                    if (cosmetics.getStackInSlot(slot).isEmpty() && (curio.isEmpty() || curio.get().canEquip(slotContext))) {
+                                        cosmetics.setStackInSlot(slot, stack.copy());
 
                                         if (curio.isPresent()) {
                                             // noinspection deprecation
                                             curio.get().playRightClickEquipSound(armorStand);
                                         } else {
-                                            armorStand.world.playSound(
+                                            armorStand.level.playSound(
                                                     null,
-                                                    armorStand.getPosition(),
-                                                    SoundEvents.ITEM_ARMOR_EQUIP_GENERIC,
-                                                    armorStand.getSoundCategory(),
+                                                    armorStand.blockPosition(),
+                                                    SoundEvents.ARMOR_EQUIP_GENERIC,
+                                                    armorStand.getSoundSource(),
                                                     1,
                                                     1
                                             );
                                         }
 
-                                        enableArmorStandArms(armorStand, stackInHand.getItem());
+                                        enableArmorStandArms(armorStand, stack.getItem());
 
                                         if (!event.getPlayer().isCreative()) {
-                                            int count = stackInHand.getCount();
-                                            stackInHand.shrink(count);
+                                            int count = stack.getCount();
+                                            stack.shrink(count);
                                         }
 
-                                        event.setCancellationResult(ActionResultType.SUCCESS);
+                                        event.setCancellationResult(InteractionResult.SUCCESS);
                                         event.setCanceled(true);
                                         return;
                                     }
@@ -144,17 +147,17 @@ public class CuriousArmorStands {
             );
         }
 
-        public static void unequipItem(ArmorStandEntity armorStand, PlayerInteractEvent.EntityInteractSpecific event) {
+        public static void unequipItem(ArmorStand armorStand, PlayerInteractEvent.EntityInteractSpecific event) {
             CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(handler -> handler.getStacksHandler(SLOT).ifPresent(stacksHandler -> {
-                IDynamicStackHandler cosmeticStacks = stacksHandler.getCosmeticStacks();
-                for (int slot = cosmeticStacks.getSlots() - 1; slot >= 0; slot--) {
-                    ItemStack stackInSlot = cosmeticStacks.getStackInSlot(slot);
+                IDynamicStackHandler cosmetics = stacksHandler.getCosmeticStacks();
+                for (int slot = cosmetics.getSlots() - 1; slot >= 0; slot--) {
+                    ItemStack stackInSlot = cosmetics.getStackInSlot(slot);
                     if (!stackInSlot.isEmpty()) {
-                        if (!armorStand.world.isRemote()) {
-                            event.getPlayer().setHeldItem(event.getHand(), stackInSlot);
-                            cosmeticStacks.setStackInSlot(slot, ItemStack.EMPTY);
+                        if (!armorStand.level.isClientSide()) {
+                            event.getPlayer().setItemInHand(event.getHand(), stackInSlot);
+                            cosmetics.setStackInSlot(slot, ItemStack.EMPTY);
                         }
-                        event.setCancellationResult(ActionResultType.SUCCESS);
+                        event.setCancellationResult(InteractionResult.SUCCESS);
                         event.setCanceled(true);
                         return;
                     }
@@ -162,23 +165,22 @@ public class CuriousArmorStands {
             }));
         }
 
-        private static void enableArmorStandArms(ArmorStandEntity entity, Item curioItem) {
-            if (CuriosApi.getCuriosHelper().getCurioTags(curioItem).contains("hands") || CuriosApi.getCuriosHelper().getCurioTags(curioItem).contains("ring") || CuriosApi.getCuriosHelper().getCurioTags(curioItem).contains("bracelet")) {
-                CompoundNBT nbt = entity.writeWithoutTypeId(new CompoundNBT());
-                nbt.putBoolean("ShowArms", true);
-                entity.read(nbt);
+        private static void enableArmorStandArms(ArmorStand entity, Item item) {
+            Set<String> tags = CuriosApi.getCuriosHelper().getCurioTags(item);
+            if (tags.contains("hands") || tags.contains("ring") || tags.contains("bracelet")) {
+                entity.setShowArms(true);
             }
         }
 
-        private static boolean canUnequipCurio(Vector3d localPos, ArmorStandEntity entity) {
+        private static boolean canUnequipCurio(Vec3 localPos, ArmorStand entity) {
             boolean isSmall = entity.isSmall();
             double y = isSmall ? localPos.y * 2 : localPos.y;
-            return !(entity.hasItemInSlot(EquipmentSlotType.FEET) && y >= 0.1 && y < 0.1 + (isSmall ? 0.8 : 0.45))
-                    && !(entity.hasItemInSlot(EquipmentSlotType.CHEST) && y >= 0.9 + (isSmall ? 0.3 : 0) && y < 0.9 + (isSmall ? 1 : 0.7))
-                    && !(entity.hasItemInSlot(EquipmentSlotType.LEGS) && y >= 0.4 && y < 0.4 + (isSmall ? 1.0 : 0.8))
-                    && !(entity.hasItemInSlot(EquipmentSlotType.HEAD) && y >= 1.6)
-                    && !entity.hasItemInSlot(EquipmentSlotType.MAINHAND)
-                    && !entity.hasItemInSlot(EquipmentSlotType.OFFHAND);
+            return !(entity.hasItemInSlot(EquipmentSlot.FEET) && y >= 0.1 && y < 0.1 + (isSmall ? 0.8 : 0.45))
+                    && !(entity.hasItemInSlot(EquipmentSlot.CHEST) && y >= 0.9 + (isSmall ? 0.3 : 0) && y < 0.9 + (isSmall ? 1 : 0.7))
+                    && !(entity.hasItemInSlot(EquipmentSlot.LEGS) && y >= 0.4 && y < 0.4 + (isSmall ? 1.0 : 0.8))
+                    && !(entity.hasItemInSlot(EquipmentSlot.HEAD) && y >= 1.6)
+                    && !entity.hasItemInSlot(EquipmentSlot.MAINHAND)
+                    && !entity.hasItemInSlot(EquipmentSlot.OFFHAND);
         }
     }
 }
