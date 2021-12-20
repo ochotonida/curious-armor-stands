@@ -4,7 +4,10 @@
 
 package curiousarmorstands;
 
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.ai.attributes.AttributeModifier;
 import net.minecraft.entity.item.ItemEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.CompoundNBT;
@@ -20,7 +23,6 @@ import net.minecraftforge.common.util.Constants;
 import net.minecraftforge.common.util.LazyOptional;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.CuriosCapability;
-import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.ISlotType;
 import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
 import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
@@ -42,6 +44,7 @@ public class CurioInventoryCapability {
         Map<String, ICurioStacksHandler> curios = new LinkedHashMap<>();
         NonNullList<ItemStack> invalidStacks = NonNullList.create();
         LivingEntity wearer;
+        Set<ICurioStacksHandler> updates = new HashSet<>();
 
         CurioInventoryWrapper(LivingEntity entity) {
             wearer = entity;
@@ -50,12 +53,18 @@ public class CurioInventoryCapability {
 
         @Override
         public void reset() {
-            if (!wearer.getEntityWorld().isRemote()) {
-                curios.clear();
-                invalidStacks.clear();
-                CuriosApi.getSlotHelper().createSlots().forEach(
-                        (slotType, stacksHandler) -> curios.put(slotType.getIdentifier(), stacksHandler)
-                );
+            ISlotHelper slotHelper = CuriosApi.getSlotHelper();
+
+            if (slotHelper != null && this.wearer != null && !this.wearer.getEntityWorld().isRemote()) {
+                this.curios.clear();
+                this.invalidStacks.clear();
+                SortedSet<ISlotType> sorted = new TreeSet<>(slotHelper.getSlotTypes(this.wearer));
+
+                for (ISlotType slotType : sorted) {
+                    this.curios.put(slotType.getIdentifier(),
+                            new CurioStacksHandler(this, slotType.getIdentifier(), slotType.getSize(), 0,
+                                    slotType.isVisible(), slotType.hasCosmetic()));
+                }
             }
         }
 
@@ -111,6 +120,7 @@ public class CurioInventoryCapability {
         public void processSlots() { }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void growSlotType(String identifier, int amount) {
             if (amount > 0) {
                 getStacksHandler(identifier).ifPresent(stackHandler -> stackHandler.grow(amount));
@@ -118,13 +128,10 @@ public class CurioInventoryCapability {
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void shrinkSlotType(String identifier, int amount) {
             if (amount > 0) {
-                getStacksHandler(identifier).ifPresent(stackHandler -> {
-                    int toShrink = Math.min(stackHandler.getSlots() - 1, amount);
-                    loseStacks(stackHandler.getStacks(), identifier, toShrink);
-                    stackHandler.shrink(amount);
-                });
+                getStacksHandler(identifier).ifPresent(stackHandler -> stackHandler.shrink(amount));
             }
         }
 
@@ -146,32 +153,196 @@ public class CurioInventoryCapability {
             }
         }
 
-        private void loseStacks(IDynamicStackHandler stackHandler, String identifier, int amount) {
-            if (wearer != null && !wearer.getEntityWorld().isRemote()) {
-                List<ItemStack> drops = new ArrayList<>();
-
-                for (int i = stackHandler.getSlots() - amount; i < stackHandler.getSlots(); i++) {
-                    ItemStack stack = stackHandler.getStackInSlot(i);
-                    drops.add(stackHandler.getStackInSlot(i));
-                    SlotContext slotContext = new SlotContext(identifier, wearer, i);
-
-                    if (!stack.isEmpty()) {
-                        UUID uuid = UUID.nameUUIDFromBytes((identifier + i).getBytes());
-                        wearer.getAttributeManager().removeModifiers(CuriosApi.getCuriosHelper().getAttributeModifiers(slotContext, uuid, stack));
-                        final int index = i;
-                        // noinspection deprecation
-                        CuriosApi.getCuriosHelper().getCurio(stack).ifPresent(curio -> curio.onUnequip(identifier, index, wearer));
-                    }
-                    stackHandler.setStackInSlot(i, ItemStack.EMPTY);
-                }
-                drops.forEach(drop -> dropStack(wearer, drop));
-            }
-        }
-
         private void dropStack(LivingEntity entity, ItemStack stack) {
             if (!entity.world.isRemote) {
                 ItemEntity itemEntity = new ItemEntity(entity.world, entity.getPosX(), entity.getPosY() + 0.5, entity.getPosZ(), stack);
                 entity.world.addEntity(itemEntity);
+            }
+        }
+
+        @Override
+        public Set<ICurioStacksHandler> getUpdatingInventories() {
+            return updates;
+        }
+
+        @Override
+        public ListNBT saveInventory(boolean clear) {
+            return new ListNBT();
+        }
+
+        @Override
+        public void loadInventory(ListNBT data) {
+
+        }
+
+        @Override
+        public void addTransientSlotModifiers(Multimap<String, AttributeModifier> modifiers) {
+            for (Map.Entry<String, Collection<AttributeModifier>> entry : modifiers.asMap().entrySet()) {
+                String id = entry.getKey();
+
+                for (AttributeModifier attributeModifier : entry.getValue()) {
+                    ICurioStacksHandler stacksHandler = this.curios.get(id);
+
+                    if (stacksHandler != null) {
+                        stacksHandler.addTransientModifier(attributeModifier);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void addPermanentSlotModifiers(Multimap<String, AttributeModifier> modifiers) {
+            for (Map.Entry<String, Collection<AttributeModifier>> entry : modifiers.asMap().entrySet()) {
+                String id = entry.getKey();
+
+                for (AttributeModifier attributeModifier : entry.getValue()) {
+                    ICurioStacksHandler stacksHandler = this.curios.get(id);
+
+                    if (stacksHandler != null) {
+                        stacksHandler.addPermanentModifier(attributeModifier);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void removeSlotModifiers(Multimap<String, AttributeModifier> modifiers) {
+            for (Map.Entry<String, Collection<AttributeModifier>> entry : modifiers.asMap().entrySet()) {
+                String id = entry.getKey();
+
+                for (AttributeModifier attributeModifier : entry.getValue()) {
+                    ICurioStacksHandler stacksHandler = this.curios.get(id);
+
+                    if (stacksHandler != null) {
+                        stacksHandler.removeModifier(attributeModifier.getID());
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void clearSlotModifiers() {
+            for (Map.Entry<String, ICurioStacksHandler> entry : this.curios.entrySet()) {
+                entry.getValue().clearModifiers();
+            }
+        }
+
+        @Override
+        public void clearCachedSlotModifiers() {
+            for (Map.Entry<String, ICurioStacksHandler> entry : this.curios.entrySet()) {
+                entry.getValue().clearCachedModifiers();
+            }
+        }
+
+        @Override
+        public Multimap<String, AttributeModifier> getModifiers() {
+            Multimap<String, AttributeModifier> result = HashMultimap.create();
+
+            for (Map.Entry<String, ICurioStacksHandler> entry : this.curios.entrySet()) {
+                result.putAll(entry.getKey(), entry.getValue().getModifiers().values());
+            }
+            return result;
+        }
+
+        @Override
+        public CompoundNBT writeNBT() {
+            CompoundNBT compound = new CompoundNBT();
+
+            ListNBT taglist = new ListNBT();
+            this.getCurios().forEach((key, stacksHandler) -> {
+                CompoundNBT tag = new CompoundNBT();
+                tag.put("StacksHandler", stacksHandler.serializeNBT());
+                tag.putString("Identifier", key);
+                taglist.add(tag);
+            });
+            compound.put("Curios", taglist);
+
+            return compound;
+        }
+
+        @Override
+        public void readNBT(CompoundNBT compoundNBT) {
+            ListNBT tagList = compoundNBT.getList("Curios", Constants.NBT.TAG_COMPOUND);
+            ISlotHelper slotHelper = CuriosApi.getSlotHelper();
+
+            if (!tagList.isEmpty() && slotHelper != null) {
+                Map<String, ICurioStacksHandler> curios = new LinkedHashMap<>();
+                SortedMap<ISlotType, ICurioStacksHandler> sortedCurios = new TreeMap<>();
+                SortedSet<ISlotType> sorted =
+                        new TreeSet<>(CuriosApi.getSlotHelper().getSlotTypes(this.wearer));
+
+                for (ISlotType slotType : sorted) {
+                    sortedCurios.put(slotType,
+                            new CurioStacksHandler(this, slotType.getIdentifier(), slotType.getSize(), 0,
+                                    slotType.isVisible(), slotType.hasCosmetic()));
+                }
+
+                for (int i = 0; i < tagList.size(); i++) {
+                    CompoundNBT tag = tagList.getCompound(i);
+                    String identifier = tag.getString("Identifier");
+                    CurioStacksHandler prevStacksHandler = new CurioStacksHandler(this, identifier);
+                    prevStacksHandler.deserializeNBT(tag.getCompound("StacksHandler"));
+
+                    Optional<ISlotType> optionalType = CuriosApi.getSlotHelper().getSlotType(identifier);
+                    optionalType.ifPresent(type -> {
+                        CurioStacksHandler newStacksHandler = new CurioStacksHandler(
+                                this, type.getIdentifier(), type.getSize(),
+                                prevStacksHandler.getSizeShift(), type.isVisible(), type.hasCosmetic());
+                        newStacksHandler.copyModifiers(prevStacksHandler);
+                        int index = 0;
+
+                        while (index < newStacksHandler.getSlots() && index < prevStacksHandler.getSlots()) {
+
+                            ItemStack prevStack = prevStacksHandler.getStacks().getStackInSlot(index);
+                            if (!prevStack.isEmpty()) {
+                                newStacksHandler.getStacks().setStackInSlot(index, prevStack);
+                            }
+
+                            ItemStack prevCosmetic = prevStacksHandler.getCosmeticStacks().getStackInSlot(index);
+                            if (!prevCosmetic.isEmpty()) {
+                                newStacksHandler.getCosmeticStacks().setStackInSlot(index, prevStacksHandler.getCosmeticStacks().getStackInSlot(index));
+                            }
+
+                            index++;
+                        }
+
+                        while (index < prevStacksHandler.getSlots()) {
+                            this.loseInvalidStack(prevStacksHandler.getStacks().getStackInSlot(index));
+                            this.loseInvalidStack(prevStacksHandler.getCosmeticStacks().getStackInSlot(index));
+                            index++;
+                        }
+
+                        sortedCurios.put(type, newStacksHandler);
+
+                        for (int j = 0;
+                             j < newStacksHandler.getRenders().size() &&
+                                     j < prevStacksHandler.getRenders()
+                                             .size(); j++) {
+                            newStacksHandler.getRenders().set(j, prevStacksHandler.getRenders().get(j));
+                        }
+                    });
+
+                    if (!optionalType.isPresent()) {
+                        IDynamicStackHandler stackHandler = prevStacksHandler.getStacks();
+                        IDynamicStackHandler cosmeticStackHandler = prevStacksHandler.getCosmeticStacks();
+
+                        for (int j = 0; j < stackHandler.getSlots(); j++) {
+                            ItemStack stack = stackHandler.getStackInSlot(j);
+
+                            if (!stack.isEmpty()) {
+                                this.loseInvalidStack(stack);
+                            }
+
+                            ItemStack cosmeticStack = cosmeticStackHandler.getStackInSlot(j);
+
+                            if (!cosmeticStack.isEmpty()) {
+                                this.loseInvalidStack(cosmeticStack);
+                            }
+                        }
+                    }
+                }
+                sortedCurios.forEach((slotType, stacksHandler) -> curios.put(slotType.getIdentifier(), stacksHandler));
+                this.setCurios(curios);
             }
         }
 
@@ -186,9 +357,7 @@ public class CurioInventoryCapability {
         }
 
         @Override
-        public void setEnchantmentBonuses(Tuple<Integer, Integer> tuple) {
-
-        }
+        public void setEnchantmentBonuses(Tuple<Integer, Integer> tuple) { }
     }
 
     public static class Provider implements ICapabilitySerializable<INBT> {
@@ -209,81 +378,12 @@ public class CurioInventoryCapability {
 
         @Override
         public INBT serializeNBT() {
-            CompoundNBT result = new CompoundNBT();
-            ListNBT slotTypes = new ListNBT();
-            instance.getCurios().forEach((key, stacksHandler) -> {
-                CompoundNBT tag = new CompoundNBT();
-                tag.put("StacksHandler", stacksHandler.serializeNBT());
-                tag.putString("Identifier", key);
-                slotTypes.add(tag);
-            });
-            result.put("Curios", slotTypes);
-            return result;
+            return CuriosCapability.INVENTORY.writeNBT(this.instance, null);
         }
 
         @Override
         public void deserializeNBT(INBT nbt) {
-            ListNBT slotTypes = ((CompoundNBT) nbt).getList("Curios", Constants.NBT.TAG_COMPOUND);
-            ISlotHelper slotHelper = CuriosApi.getSlotHelper();
-
-            if (!slotTypes.isEmpty() && slotHelper != null) {
-                Map<String, ICurioStacksHandler> curios = new LinkedHashMap<>();
-                SortedMap<ISlotType, ICurioStacksHandler> sortedCurios = slotHelper.createSlots();
-
-                for (int slotTypeIndex = 0; slotTypeIndex < slotTypes.size(); slotTypeIndex++) {
-                    CompoundNBT curioTag = slotTypes.getCompound(slotTypeIndex);
-                    String identifier = curioTag.getString("Identifier");
-                    CurioStacksHandler prevStacksHandler = new CurioStacksHandler();
-                    prevStacksHandler.deserializeNBT(curioTag.getCompound("StacksHandler"));
-
-                    Optional<ISlotType> optionalSlotType = CuriosApi.getSlotHelper().getSlotType(identifier);
-                    optionalSlotType.ifPresent(slotType -> {
-                        CurioStacksHandler newStacksHandler = new CurioStacksHandler(slotType.getSize(), prevStacksHandler.getSizeShift(), slotType.isVisible(), slotType.hasCosmetic());
-                        
-                        int slotIndex = 0;
-                        while (slotIndex < newStacksHandler.getSlots() && slotIndex < prevStacksHandler.getSlots()) {
-                            ItemStack prevStack = prevStacksHandler.getStacks().getStackInSlot(slotIndex);
-                            if (!prevStack.isEmpty()) {
-                                newStacksHandler.getStacks().setStackInSlot(slotIndex, prevStack);
-                            }
-
-                            ItemStack prevCosmetic = prevStacksHandler.getCosmeticStacks().getStackInSlot(slotIndex);
-                            if (!prevCosmetic.isEmpty()) {
-                                newStacksHandler.getCosmeticStacks().setStackInSlot(slotIndex, prevStacksHandler.getCosmeticStacks().getStackInSlot(slotIndex));
-                            }
-                            
-                            slotIndex++;
-                        }
-
-                        while (slotIndex < prevStacksHandler.getSlots()) {
-                            instance.loseInvalidStack(prevStacksHandler.getStacks().getStackInSlot(slotIndex));
-                            instance.loseInvalidStack(prevStacksHandler.getCosmeticStacks().getStackInSlot(slotIndex));
-                            slotIndex++;
-                        }
-                        
-                        sortedCurios.put(slotType, newStacksHandler);
-                    });
-
-                    if (!optionalSlotType.isPresent()) {
-                        IDynamicStackHandler stackHandler = prevStacksHandler.getStacks();
-                        IDynamicStackHandler cosmeticStackHandler = prevStacksHandler.getCosmeticStacks();
-
-                        for (int removedSlotIndex = 0; removedSlotIndex < stackHandler.getSlots(); removedSlotIndex++) {
-                            ItemStack stack = stackHandler.getStackInSlot(removedSlotIndex);
-                            if (!stack.isEmpty()) {
-                                instance.loseInvalidStack(stack);
-                            }
-
-                            ItemStack cosmeticStack = cosmeticStackHandler.getStackInSlot(removedSlotIndex);
-                            if (!cosmeticStack.isEmpty()) {
-                                instance.loseInvalidStack(cosmeticStack);
-                            }
-                        }
-                    }
-                }
-                sortedCurios.forEach((slotType, stacksHandler) -> curios.put(slotType.getIdentifier(), stacksHandler));
-                instance.setCurios(curios);
-            }
+            CuriosCapability.INVENTORY.readNBT(this.instance, null, nbt);
         }
     }
 }
