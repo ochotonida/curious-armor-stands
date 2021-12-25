@@ -65,7 +65,7 @@ public class CurioInventoryCapability {
 
                 for (ISlotType slotType : sorted) {
                     this.curios.put(slotType.getIdentifier(), new CurioStacksHandler(
-                            this, slotType.getIdentifier(), slotType.getSize(), 0, slotType.isVisible(), slotType.hasCosmetic())
+                            this, slotType.getIdentifier(), slotType.getSize(), slotType.isVisible(), slotType.hasCosmetic())
                     );
                 }
             }
@@ -334,7 +334,7 @@ public class CurioInventoryCapability {
 
                 for (ISlotType slotType : sorted) {
                     sortedCurios.put(slotType, new CurioStacksHandler(
-                            this, slotType.getIdentifier(), slotType.getSize(), 0, slotType.isVisible(), slotType.hasCosmetic()
+                            this, slotType.getIdentifier(), slotType.getSize(), slotType.isVisible(), slotType.hasCosmetic()
                     ));
                 }
 
@@ -347,7 +347,7 @@ public class CurioInventoryCapability {
                     Optional<ISlotType> optionalType = CuriosApi.getSlotHelper().getSlotType(identifier);
                     optionalType.ifPresent(type -> {
                         CurioStacksHandler newStacksHandler = new CurioStacksHandler(
-                                this, type.getIdentifier(), type.getSize(), prevStacksHandler.getSizeShift(), type.isVisible(), type.hasCosmetic()
+                                this, type.getIdentifier(), type.getSize(), type.isVisible(), type.hasCosmetic()
                         );
                         newStacksHandler.copyModifiers(prevStacksHandler);
                         int slotIndex = 0;
