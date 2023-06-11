@@ -1,15 +1,15 @@
 package curiousarmorstands;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Vector3f;
+import com.mojang.math.Axis;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.EntityModel;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
 import net.minecraft.client.renderer.entity.RenderLayerParent;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
 import net.minecraftforge.api.distmarker.Dist;
@@ -20,10 +20,10 @@ import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 import javax.annotation.Nonnull;
 
 @OnlyIn(Dist.CLIENT)
-public class ArmorStandCuriosLayer<ENTITY extends LivingEntity, MODEL extends EntityModel<ENTITY>>
+public class ArmorStandCuriosDisplayLayer<ENTITY extends LivingEntity, MODEL extends EntityModel<ENTITY>>
         extends RenderLayer<ENTITY, MODEL> {
 
-    public ArmorStandCuriosLayer(RenderLayerParent<ENTITY, MODEL> renderer) {
+    public ArmorStandCuriosDisplayLayer(RenderLayerParent<ENTITY, MODEL> renderer) {
         super(renderer);
     }
 
@@ -54,19 +54,20 @@ public class ArmorStandCuriosLayer<ENTITY extends LivingEntity, MODEL extends En
                         poseStack.pushPose();
                         poseStack.scale(0.25F, 0.25F, 0.25F);
                         poseStack.translate((itemCount - 1) / 2F, -4, 0);
-                        poseStack.mulPose(Vector3f.XP.rotationDegrees(180));
-                        poseStack.mulPose(Vector3f.YP.rotationDegrees(180));
+                        poseStack.mulPose(Axis.XP.rotationDegrees(180));
+                        poseStack.mulPose(Axis.YP.rotationDegrees(180));
 
                         for (int slot = cosmetics.getSlots() - 1; slot >= 0; slot--) {
                             ItemStack item = cosmetics.getStackInSlot(slot);
                             if (!item.isEmpty()) {
                                 Minecraft.getInstance().getItemRenderer().renderStatic(
                                         item,
-                                        ItemTransforms.TransformType.FIXED,
+                                        ItemDisplayContext.FIXED,
                                         light,
                                         OverlayTexture.NO_OVERLAY,
                                         poseStack,
                                         buffer,
+                                        null,
                                         0
                                 );
                                 poseStack.translate(1, 0, 0);

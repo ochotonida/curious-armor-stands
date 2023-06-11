@@ -1,6 +1,8 @@
 {
     "pack": {
-        "pack_format": 7,
-        "description": "Curious Armor Stands' resources"
+        "description": {
+            "text": "${mod_id} resources"
+        },
+        "pack_format": 15
     }
 }

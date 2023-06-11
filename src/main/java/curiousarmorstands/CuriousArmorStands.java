@@ -5,7 +5,6 @@ import net.minecraft.client.renderer.entity.ArmorStandRenderer;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.decoration.ArmorStand;
@@ -14,14 +13,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
-import net.minecraftforge.event.AttachCapabilitiesEvent;
-import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.event.entity.EntityJoinLevelEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.InterModComms;
 import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.fml.event.lifecycle.InterModEnqueueEvent;
-import top.theillusivec4.curios.api.*;
+import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurio;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 import top.theillusivec4.curios.client.render.CuriosLayer;
@@ -35,21 +32,7 @@ public class CuriousArmorStands {
 
     public static final String MODID = "curious_armor_stands";
 
-    public static final String SLOT = "armor_stand_curio";
-
-    @Mod.EventBusSubscriber(bus = Mod.EventBusSubscriber.Bus.MOD)
-    public static class ModEvents {
-
-        @SubscribeEvent
-        public static void enqueueIMC(InterModEnqueueEvent event) {
-            InterModComms.sendTo("curios", SlotTypeMessage.REGISTER_TYPE,
-                    () -> new SlotTypeMessage.Builder(SLOT)
-                            .cosmetic()
-                            .size(0)
-                            .build()
-            );
-        }
-    }
+    public static final String SLOT = "curio";
 
     @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
     public static class ClientModEvents {
@@ -59,7 +42,7 @@ public class CuriousArmorStands {
             EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(EntityType.ARMOR_STAND);
             if (renderer instanceof ArmorStandRenderer armorStandRenderer) {
                 armorStandRenderer.addLayer(new CuriosLayer<>(armorStandRenderer));
-                armorStandRenderer.addLayer(new ArmorStandCuriosLayer<>(armorStandRenderer));
+                armorStandRenderer.addLayer(new ArmorStandCuriosDisplayLayer<>(armorStandRenderer));
             }
         }
     }
@@ -68,16 +51,9 @@ public class CuriousArmorStands {
     public static class Events {
 
         @SubscribeEvent
-        public static void entityJoinWorld(EntityJoinWorldEvent event) {
-            if (!event.getWorld().isClientSide() && event.getEntity() instanceof ArmorStand armorStand) {
+        public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
+            if (!event.getLevel().isClientSide() && event.getEntity() instanceof ArmorStand armorStand) {
                 CuriosApi.getSlotHelper().setSlotsForType(SLOT, armorStand, 8);
-            }
-        }
-
-        @SubscribeEvent
-        public static void attachCapabilities(AttachCapabilitiesEvent<Entity> event) {
-            if (event.getObject() instanceof ArmorStand armorStand) {
-                event.addCapability(CuriosCapability.ID_INVENTORY, CurioInventoryCapability.createProvider(armorStand));
             }
         }
 
@@ -99,7 +75,7 @@ public class CuriousArmorStands {
                 return;
             }
 
-            if (armorStand.level.isClientSide()) {
+            if (armorStand.level().isClientSide()) {
                 event.setCancellationResult(InteractionResult.SUCCESS);
                 event.setCanceled(true);
                 return;
@@ -120,7 +96,7 @@ public class CuriousArmorStands {
                                             // noinspection deprecation
                                             curio.get().playRightClickEquipSound(armorStand);
                                         } else {
-                                            armorStand.level.playSound(
+                                            armorStand.level().playSound(
                                                     null,
                                                     armorStand.blockPosition(),
                                                     SoundEvents.ARMOR_EQUIP_GENERIC,
@@ -132,7 +108,7 @@ public class CuriousArmorStands {
 
                                         enableArmorStandArms(armorStand, stack.getItem());
 
-                                        if (!event.getPlayer().isCreative()) {
+                                        if (!event.getEntity().isCreative()) {
                                             int count = stack.getCount();
                                             stack.shrink(count);
                                         }
@@ -153,8 +129,8 @@ public class CuriousArmorStands {
                 for (int slot = cosmetics.getSlots() - 1; slot >= 0; slot--) {
                     ItemStack stackInSlot = cosmetics.getStackInSlot(slot);
                     if (!stackInSlot.isEmpty()) {
-                        if (!armorStand.level.isClientSide()) {
-                            event.getPlayer().setItemInHand(event.getHand(), stackInSlot);
+                        if (!armorStand.level().isClientSide()) {
+                            event.getEntity().setItemInHand(event.getHand(), stackInSlot);
                             cosmetics.setStackInSlot(slot, ItemStack.EMPTY);
                         }
                         event.setCancellationResult(InteractionResult.SUCCESS);

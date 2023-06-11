@@ -1,33 +1,34 @@
 modLoader="javafml"
-loaderVersion="[39,)"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
 issueTrackerURL="https://github.com/ochotonida/curious-armor-stands/issues"
-license="MIT"
 
 [[mods]]
-modId="curious_armor_stands"
-version="${file.jarVersion}"
-displayName="Curious Armor Stands"
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
 displayURL="https://www.curseforge.com/minecraft/mc-mods/curious-armor-stands"
 logoFile="logo.png"
-description='''Allows armor stands to display curios'''
+authors="${mod_authors}"
+description='''${mod_description}'''
 
-[[dependencies.curious_armor_stands]]
+[[dependencies.${mod_id}]]
     modId="forge"
     mandatory=true
-    versionRange="[39,)"
+    versionRange="${forge_version_range}"
     ordering="NONE"
     side="BOTH"
 
-[[dependencies.curious_armor_stands]]
+[[dependencies.${mod_id}]]
     modId="minecraft"
     mandatory=true
-    versionRange="[1.18,1.19)"
+    versionRange="${minecraft_version_range}"
     ordering="NONE"
     side="BOTH"
 
-[[dependencies.curious_armor_stands]]
+[[dependencies.${mod_id}]]
     modId="curios"
     mandatory=true
-    versionRange="[1.18.1-5.0.4.0,)"
+    versionRange="[${curios_version},)"
     ordering="NONE"
     side="BOTH"
