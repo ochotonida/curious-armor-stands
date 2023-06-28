@@ -27,7 +27,6 @@ import java.util.Optional;
 import java.util.Set;
 
 @Mod(CuriousArmorStands.MODID)
-@SuppressWarnings("unused")
 public class CuriousArmorStands {
 
     public static final String MODID = "curious_armor_stands";
