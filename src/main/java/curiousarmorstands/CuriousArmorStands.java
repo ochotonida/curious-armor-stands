@@ -7,24 +7,25 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.EntityRenderersEvent;
-import net.minecraftforge.event.entity.EntityJoinLevelEvent;
-import net.minecraftforge.event.entity.player.PlayerInteractEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurio;
+import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 import top.theillusivec4.curios.client.render.CuriosLayer;
 
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Mod(CuriousArmorStands.MODID)
 public class CuriousArmorStands {
@@ -33,10 +34,13 @@ public class CuriousArmorStands {
 
     public static final String SLOT = "curio";
 
+    public static final UUID ATTRIBUTE_MODIFIER_UUID = UUID.fromString("c18b7612-ccbd-4766-a0dd-166fb0e13505");
+
     @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
     public static class ClientModEvents {
 
         @SubscribeEvent
+        @SuppressWarnings("unused")
         public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
             EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(EntityType.ARMOR_STAND);
             if (renderer instanceof ArmorStandRenderer armorStandRenderer) {
@@ -49,16 +53,18 @@ public class CuriousArmorStands {
     @Mod.EventBusSubscriber(modid = CuriousArmorStands.MODID)
     public static class Events {
 
-        @SubscribeEvent
-        public static void onEntityJoinLevel(EntityJoinLevelEvent event) {
-            if (!event.getLevel().isClientSide() && event.getEntity() instanceof ArmorStand armorStand) {
-                CuriosApi.getSlotHelper().setSlotsForType(SLOT, armorStand, 8);
-            }
+        private static void createAttributeModifier(ArmorStand armorStand) {
+            CuriosApi.getCuriosInventory(armorStand)
+                    .flatMap(inv -> inv.getStacksHandler(SLOT))
+                    .filter(stacks -> !stacks.getModifiers().containsKey(ATTRIBUTE_MODIFIER_UUID))
+                    .ifPresent(stacks -> stacks.addPermanentModifier(new AttributeModifier(ATTRIBUTE_MODIFIER_UUID, "curious_armor_stands:slots", 8 - 1, AttributeModifier.Operation.ADDITION)));
         }
 
         @SubscribeEvent
+        @SuppressWarnings("unused")
         public static void onEntityInteract(PlayerInteractEvent.EntityInteractSpecific event) {
             if (event.getTarget() instanceof ArmorStand armorStand) {
+                createAttributeModifier(armorStand);
                 ItemStack stack = event.getItemStack();
 
                 if (!stack.isEmpty()) {
@@ -70,7 +76,7 @@ public class CuriousArmorStands {
         }
 
         public static void equipItem(ArmorStand armorStand, ItemStack stack, PlayerInteractEvent.EntityInteractSpecific event) {
-            if (CuriosApi.getCuriosHelper().getCurioTags(stack.getItem()).isEmpty()) {
+            if (CuriosApi.getItemStackSlots(stack).isEmpty()) {
                 return;
             }
 
@@ -80,69 +86,79 @@ public class CuriousArmorStands {
                 return;
             }
 
-            CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(
-                    handler -> handler.getStacksHandler(SLOT).ifPresent(
-                            stacksHandler -> {
-                                IDynamicStackHandler cosmetics = stacksHandler.getCosmeticStacks();
-                                Optional<ICurio> curio = CuriosApi.getCuriosHelper().getCurio(stack).resolve();
+            CuriosApi.getCuriosInventory(armorStand)
+                    .flatMap(inv -> inv.getStacksHandler(SLOT))
+                    .map(ICurioStacksHandler::getCosmeticStacks)
+                    .ifPresent(cosmetics -> {
+                        Optional<ICurio> curio = CuriosApi.getCurio(stack);
 
-                                for (int slot = 0; slot < cosmetics.getSlots(); slot++) {
-                                    SlotContext slotContext = new SlotContext(SLOT, armorStand, slot, true, true);
-                                    if (cosmetics.getStackInSlot(slot).isEmpty() && (curio.isEmpty() || curio.get().canEquip(slotContext))) {
-                                        cosmetics.setStackInSlot(slot, stack.copy());
+                        for (int slot = 0; slot < cosmetics.getSlots(); slot++) {
+                            SlotContext slotContext = new SlotContext(SLOT, armorStand, slot, true, true);
+                            if (cosmetics.getStackInSlot(slot).isEmpty() && (curio.isEmpty() || curio.get().canEquip(slotContext))) {
+                                cosmetics.setStackInSlot(slot, stack.copy());
 
-                                        if (curio.isPresent()) {
-                                            // noinspection deprecation
-                                            curio.get().playRightClickEquipSound(armorStand);
-                                        } else {
-                                            armorStand.level().playSound(
-                                                    null,
-                                                    armorStand.blockPosition(),
-                                                    SoundEvents.ARMOR_EQUIP_GENERIC,
-                                                    armorStand.getSoundSource(),
-                                                    1,
-                                                    1
-                                            );
-                                        }
+                                playEquipSound(curio, slotContext);
+                                enableArmorStandArms(armorStand, stack);
 
-                                        enableArmorStandArms(armorStand, stack.getItem());
-
-                                        if (!event.getEntity().isCreative()) {
-                                            int count = stack.getCount();
-                                            stack.shrink(count);
-                                        }
-
-                                        event.setCancellationResult(InteractionResult.SUCCESS);
-                                        event.setCanceled(true);
-                                        return;
-                                    }
+                                if (!event.getEntity().isCreative()) {
+                                    int count = stack.getCount();
+                                    stack.shrink(count);
                                 }
+
+                                event.setCancellationResult(InteractionResult.SUCCESS);
+                                event.setCanceled(true);
+                                return;
                             }
-                    )
-            );
+                        }
+                    });
+        }
+
+        private static void playEquipSound(Optional<ICurio> curio, SlotContext slotContext) {
+            if (curio.isPresent()) {
+                ICurio.SoundInfo soundInfo = curio.get().getEquipSound(slotContext);
+                slotContext.entity().level().playSound(
+                        null,
+                        slotContext.entity().blockPosition(),
+                        soundInfo.soundEvent(),
+                        slotContext.entity().getSoundSource(),
+                        soundInfo.volume(),
+                        soundInfo.pitch()
+                );
+            } else {
+                slotContext.entity().level().playSound(
+                        null,
+                        slotContext.entity().blockPosition(),
+                        SoundEvents.ARMOR_EQUIP_GENERIC,
+                        slotContext.entity().getSoundSource(),
+                        1,
+                        1
+                );
+            }
         }
 
         public static void unequipItem(ArmorStand armorStand, PlayerInteractEvent.EntityInteractSpecific event) {
-            CuriosApi.getCuriosHelper().getCuriosHandler(armorStand).ifPresent(handler -> handler.getStacksHandler(SLOT).ifPresent(stacksHandler -> {
-                IDynamicStackHandler cosmetics = stacksHandler.getCosmeticStacks();
-                for (int slot = cosmetics.getSlots() - 1; slot >= 0; slot--) {
-                    ItemStack stackInSlot = cosmetics.getStackInSlot(slot);
-                    if (!stackInSlot.isEmpty()) {
-                        if (!armorStand.level().isClientSide()) {
-                            event.getEntity().setItemInHand(event.getHand(), stackInSlot);
-                            cosmetics.setStackInSlot(slot, ItemStack.EMPTY);
+            CuriosApi.getCuriosInventory(armorStand)
+                    .flatMap(handler -> handler.getStacksHandler(SLOT))
+                    .ifPresent(stacksHandler -> {
+                        IDynamicStackHandler cosmetics = stacksHandler.getCosmeticStacks();
+                        for (int slot = cosmetics.getSlots() - 1; slot >= 0; slot--) {
+                            ItemStack stackInSlot = cosmetics.getStackInSlot(slot);
+                            if (!stackInSlot.isEmpty()) {
+                                if (!armorStand.level().isClientSide()) {
+                                    event.getEntity().setItemInHand(event.getHand(), stackInSlot);
+                                    cosmetics.setStackInSlot(slot, ItemStack.EMPTY);
+                                }
+                                event.setCancellationResult(InteractionResult.SUCCESS);
+                                event.setCanceled(true);
+                                return;
+                            }
                         }
-                        event.setCancellationResult(InteractionResult.SUCCESS);
-                        event.setCanceled(true);
-                        return;
-                    }
-                }
-            }));
+                    });
         }
 
-        private static void enableArmorStandArms(ArmorStand entity, Item item) {
-            Set<String> tags = CuriosApi.getCuriosHelper().getCurioTags(item);
-            if (tags.contains("hands") || tags.contains("ring") || tags.contains("bracelet")) {
+        private static void enableArmorStandArms(ArmorStand entity, ItemStack stack) {
+            Set<String> slots = CuriosApi.getItemStackSlots(stack).keySet();
+            if (slots.contains("hands") || slots.contains("ring") || slots.contains("bracelet")) {
                 entity.setShowArms(true);
             }
         }

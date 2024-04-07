@@ -12,14 +12,12 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemDisplayContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.EntityHitResult;
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
 import top.theillusivec4.curios.api.CuriosApi;
-import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
+import top.theillusivec4.curios.api.type.capability.ICuriosItemHandler;
+import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 
 import javax.annotation.Nonnull;
 
-@OnlyIn(Dist.CLIENT)
 public class ArmorStandCuriosDisplayLayer<ENTITY extends LivingEntity, MODEL extends EntityModel<ENTITY>>
         extends RenderLayer<ENTITY, MODEL> {
 
@@ -41,9 +39,11 @@ public class ArmorStandCuriosDisplayLayer<ENTITY extends LivingEntity, MODEL ext
             float headPitch
     ) {
         if (Minecraft.getInstance().hitResult instanceof EntityHitResult hitResult && hitResult.getEntity() == entity) {
-            CuriosApi.getCuriosHelper().getCuriosHandler(entity).ifPresent(
-                    handler -> {
-                        IDynamicStackHandler cosmetics = handler.getCurios().get(CuriousArmorStands.SLOT).getCosmeticStacks();
+            CuriosApi.getCuriosInventory(entity)
+                    .map(ICuriosItemHandler::getCurios)
+                    .map(curios -> curios.get(CuriousArmorStands.SLOT))
+                    .map(ICurioStacksHandler::getCosmeticStacks)
+                    .ifPresent(cosmetics -> {
                         int itemCount = 0;
                         for (int slot = 0; slot < cosmetics.getSlots(); slot++) {
                             if (!cosmetics.getStackInSlot(slot).isEmpty()) {
