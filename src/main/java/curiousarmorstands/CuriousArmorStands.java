@@ -1,12 +1,16 @@
 package curiousarmorstands;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.entity.ArmorStandRenderer;
+import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.decoration.ArmorStand;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -36,13 +40,33 @@ public class CuriousArmorStands {
     @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
     public static class ClientModEvents {
 
+        @SuppressWarnings("deprecation")
         @SubscribeEvent
         public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
-            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(EntityType.ARMOR_STAND);
-            if (renderer instanceof ArmorStandRenderer armorStandRenderer) {
-                armorStandRenderer.addLayer(new CuriosLayer<>(armorStandRenderer));
-                armorStandRenderer.addLayer(new ArmorStandCuriosDisplayLayer<>(armorStandRenderer));
+            ResourceLocation strawStatueId = new ResourceLocation("strawstatues:straw_statue");
+            if (BuiltInRegistries.ENTITY_TYPE.containsKey(strawStatueId)) {
+                addLayer(BuiltInRegistries.ENTITY_TYPE.get(strawStatueId));
             }
+            addLayer(EntityType.ARMOR_STAND);
+        }
+
+        private static void addLayer(EntityType<?> type) {
+            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(type);
+            try {
+                addLayers(cast(renderer));
+            } catch (ClassCastException ignored) {
+
+            }
+        }
+
+        private static <E extends LivingEntity, M extends HumanoidModel<E>> void addLayers(LivingEntityRenderer<E, M> renderer) {
+            renderer.addLayer(new CuriosLayer<>(renderer));
+            renderer.addLayer(new ArmorStandCuriosDisplayLayer<>(renderer));
+        }
+
+        private static <T> T cast(Object object) {
+            // noinspection unchecked
+            return (T) object;
         }
     }
 
