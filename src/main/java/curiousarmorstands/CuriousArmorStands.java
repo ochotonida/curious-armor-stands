@@ -17,6 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -40,7 +41,7 @@ public class CuriousArmorStands {
 
     public static final UUID ATTRIBUTE_MODIFIER_UUID = UUID.fromString("c18b7612-ccbd-4766-a0dd-166fb0e13505");
 
-    @Mod.EventBusSubscriber(value = Dist.CLIENT, bus = Mod.EventBusSubscriber.Bus.MOD)
+    @EventBusSubscriber(value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
     public static class ClientModEvents {
 
         @SubscribeEvent
@@ -73,14 +74,14 @@ public class CuriousArmorStands {
         }
     }
 
-    @Mod.EventBusSubscriber(modid = CuriousArmorStands.MODID)
+    @EventBusSubscriber(modid = CuriousArmorStands.MODID)
     public static class Events {
 
         private static void createAttributeModifier(ArmorStand armorStand) {
             CuriosApi.getCuriosInventory(armorStand)
                     .flatMap(inv -> inv.getStacksHandler(SLOT))
                     .filter(stacks -> !stacks.getModifiers().containsKey(ATTRIBUTE_MODIFIER_UUID))
-                    .ifPresent(stacks -> stacks.addPermanentModifier(new AttributeModifier(ATTRIBUTE_MODIFIER_UUID, "curious_armor_stands:slots", 8 - 1, AttributeModifier.Operation.ADDITION)));
+                    .ifPresent(stacks -> stacks.addPermanentModifier(new AttributeModifier(ATTRIBUTE_MODIFIER_UUID, "curious_armor_stands:slots", 8 - 1, AttributeModifier.Operation.ADD_VALUE)));
         }
 
         @SubscribeEvent
@@ -99,7 +100,7 @@ public class CuriousArmorStands {
         }
 
         public static void equipItem(ArmorStand armorStand, ItemStack stack, PlayerInteractEvent.EntityInteractSpecific event) {
-            if (CuriosApi.getItemStackSlots(stack).isEmpty()) {
+            if (CuriosApi.getItemStackSlots(stack, armorStand.level()).isEmpty()) {
                 return;
             }
 
@@ -151,7 +152,7 @@ public class CuriousArmorStands {
                 slotContext.entity().level().playSound(
                         null,
                         slotContext.entity().blockPosition(),
-                        SoundEvents.ARMOR_EQUIP_GENERIC,
+                        SoundEvents.ARMOR_EQUIP_GENERIC.value(),
                         slotContext.entity().getSoundSource(),
                         1,
                         1
@@ -180,7 +181,7 @@ public class CuriousArmorStands {
         }
 
         private static void enableArmorStandArms(ArmorStand entity, ItemStack stack) {
-            Set<String> slots = CuriosApi.getItemStackSlots(stack).keySet();
+            Set<String> slots = CuriosApi.getItemStackSlots(stack, entity.level()).keySet();
             if (slots.contains("hands") || slots.contains("ring") || slots.contains("bracelet")) {
                 entity.setShowArms(true);
             }
