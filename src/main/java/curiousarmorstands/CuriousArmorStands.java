@@ -30,16 +30,15 @@ import top.theillusivec4.curios.client.render.CuriosLayer;
 
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
-@Mod(CuriousArmorStands.MODID)
+@Mod(CuriousArmorStands.MOD_ID)
 public class CuriousArmorStands {
 
-    public static final String MODID = "curious_armor_stands";
+    public static final String MOD_ID = "curious_armor_stands";
 
     public static final String SLOT = "curio";
 
-    public static final UUID ATTRIBUTE_MODIFIER_UUID = UUID.fromString("c18b7612-ccbd-4766-a0dd-166fb0e13505");
+    public static final ResourceLocation ATTRIBUTE_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(MOD_ID, "slots");
 
     @EventBusSubscriber(value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
     public static class ClientModEvents {
@@ -47,7 +46,7 @@ public class CuriousArmorStands {
         @SubscribeEvent
         @SuppressWarnings("unused")
         public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
-            ResourceLocation strawStatueId = new ResourceLocation("strawstatues:straw_statue");
+            ResourceLocation strawStatueId = ResourceLocation.fromNamespaceAndPath("strawstatues", "straw_statue");
             if (BuiltInRegistries.ENTITY_TYPE.containsKey(strawStatueId)) {
                 addLayer(BuiltInRegistries.ENTITY_TYPE.get(strawStatueId));
             }
@@ -74,14 +73,14 @@ public class CuriousArmorStands {
         }
     }
 
-    @EventBusSubscriber(modid = CuriousArmorStands.MODID)
+    @EventBusSubscriber(modid = CuriousArmorStands.MOD_ID)
     public static class Events {
 
         private static void createAttributeModifier(ArmorStand armorStand) {
             CuriosApi.getCuriosInventory(armorStand)
                     .flatMap(inv -> inv.getStacksHandler(SLOT))
-                    .filter(stacks -> !stacks.getModifiers().containsKey(ATTRIBUTE_MODIFIER_UUID))
-                    .ifPresent(stacks -> stacks.addPermanentModifier(new AttributeModifier(ATTRIBUTE_MODIFIER_UUID, "curious_armor_stands:slots", 8 - 1, AttributeModifier.Operation.ADD_VALUE)));
+                    .filter(stacks -> !stacks.getModifiers().containsKey(ATTRIBUTE_MODIFIER_ID))
+                    .ifPresent(stacks -> stacks.addPermanentModifier(new AttributeModifier(ATTRIBUTE_MODIFIER_ID, 8 - 1, AttributeModifier.Operation.ADD_VALUE)));
         }
 
         @SubscribeEvent

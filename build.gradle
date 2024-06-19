@@ -3,7 +3,7 @@ plugins {
     id 'eclipse'
     id 'idea'
     id 'maven-publish'
-    id 'net.neoforged.gradle.userdev' version '7.0.133'
+    id 'net.neoforged.gradle.userdev' version '7.0.142'
 }
 
 version = mod_version
@@ -47,7 +47,7 @@ repositories {
 
 dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
-    implementation "top.theillusivec4.curios:curios-neoforge:${curios_version}+${minecraft_version}"
+    implementation "top.theillusivec4.curios:curios-neoforge:${curios_version}"
 }
 
 tasks.withType(ProcessResources).configureEach {
