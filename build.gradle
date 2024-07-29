@@ -41,7 +41,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 repositories {
     maven {
         name "curios"
-        url "https://maven.theillusivec4.top/"
+        url "https://maven.octo-studios.com/releases"
     }
 }
 

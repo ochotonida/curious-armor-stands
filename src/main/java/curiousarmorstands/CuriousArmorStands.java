@@ -1,6 +1,5 @@
 package curiousarmorstands;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
@@ -48,15 +47,17 @@ public class CuriousArmorStands {
         public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
             ResourceLocation strawStatueId = ResourceLocation.fromNamespaceAndPath("strawstatues", "straw_statue");
             if (BuiltInRegistries.ENTITY_TYPE.containsKey(strawStatueId)) {
-                addLayer(BuiltInRegistries.ENTITY_TYPE.get(strawStatueId));
+                addLayer(event, BuiltInRegistries.ENTITY_TYPE.get(strawStatueId));
             }
-            addLayer(EntityType.ARMOR_STAND);
+            addLayer(event, EntityType.ARMOR_STAND);
         }
 
-        private static void addLayer(EntityType<?> type) {
-            EntityRenderer<?> renderer = Minecraft.getInstance().getEntityRenderDispatcher().renderers.get(type);
+        private static void addLayer(EntityRenderersEvent.AddLayers event, EntityType<?> type) {
+            EntityRenderer<?> renderer = event.getRenderer(type);
             try {
-                addLayers(cast(renderer));
+                if (renderer != null) {
+                    addLayers(cast(renderer));
+                }
             } catch (ClassCastException ignored) {
 
             }
