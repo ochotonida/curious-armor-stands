@@ -2,7 +2,9 @@ package curiousarmorstands;
 
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.entity.LivingEntityRenderer;
+import net.minecraft.client.renderer.entity.state.HumanoidRenderState;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvents;
@@ -21,11 +23,12 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.CuriosSlotTypes;
 import top.theillusivec4.curios.api.SlotContext;
 import top.theillusivec4.curios.api.type.capability.ICurio;
 import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
-import top.theillusivec4.curios.client.render.CuriosLayer;
+import top.theillusivec4.curios.client.CuriosLayer;
 
 import java.util.Optional;
 import java.util.Set;
@@ -46,30 +49,28 @@ public class CuriousArmorStands {
         @SuppressWarnings("unused")
         public static void onAddLayers(EntityRenderersEvent.AddLayers event) {
             ResourceLocation strawStatueId = ResourceLocation.fromNamespaceAndPath("strawstatues", "straw_statue");
-            if (BuiltInRegistries.ENTITY_TYPE.containsKey(strawStatueId)) {
-                addLayer(event, BuiltInRegistries.ENTITY_TYPE.get(strawStatueId));
-            }
-            addLayer(event, EntityType.ARMOR_STAND);
+            BuiltInRegistries.ENTITY_TYPE.get(strawStatueId).ifPresent(entity -> addLayers(event, entity.value()));
+            addLayers(event, EntityType.ARMOR_STAND);
         }
 
-        private static void addLayer(EntityRenderersEvent.AddLayers event, EntityType<?> type) {
-            EntityRenderer<?> renderer = event.getRenderer(type);
+        private static void addLayers(EntityRenderersEvent.AddLayers event, EntityType<?> type) {
+            EntityRenderer<?, ?> renderer = event.getRenderer(type);
             try {
                 if (renderer != null) {
-                    addLayers(cast(renderer));
+                    addLayers(cast(renderer), event.getContext());
                 }
             } catch (ClassCastException ignored) {
 
             }
         }
 
-        private static <E extends LivingEntity, M extends HumanoidModel<E>> void addLayers(LivingEntityRenderer<E, M> renderer) {
-            renderer.addLayer(new CuriosLayer<>(renderer));
+        private static <T extends LivingEntity, S extends HumanoidRenderState, M extends HumanoidModel<S>> void addLayers(LivingEntityRenderer<T, S, M> renderer, EntityRendererProvider.Context context) {
+            renderer.addLayer(new CuriosLayer<>(renderer, context));
             renderer.addLayer(new ArmorStandCuriosDisplayLayer<>(renderer));
         }
 
+        @SuppressWarnings("unchecked")
         private static <T> T cast(Object object) {
-            // noinspection unchecked
             return (T) object;
         }
     }
@@ -100,7 +101,7 @@ public class CuriousArmorStands {
         }
 
         public static void equipItem(ArmorStand armorStand, ItemStack stack, PlayerInteractEvent.EntityInteractSpecific event) {
-            if (CuriosApi.getItemStackSlots(stack, armorStand.level()).isEmpty()) {
+            if (CuriosSlotTypes.getItemSlotTypes(stack, armorStand.level().isClientSide()).isEmpty()) {
                 return;
             }
 
@@ -181,7 +182,7 @@ public class CuriousArmorStands {
         }
 
         private static void enableArmorStandArms(ArmorStand entity, ItemStack stack) {
-            Set<String> slots = CuriosApi.getItemStackSlots(stack, entity.level()).keySet();
+            Set<String> slots = CuriosSlotTypes.getItemSlotTypes(stack, entity.level().isClientSide()).keySet();
             if (slots.contains("hands") || slots.contains("ring") || slots.contains("bracelet")) {
                 entity.setShowArms(true);
             }
