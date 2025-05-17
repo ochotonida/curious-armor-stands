@@ -33,12 +33,15 @@ import top.theillusivec4.curios.client.CuriosLayer;
 import java.util.Optional;
 import java.util.Set;
 
+// TODO switch to ModDevGradle
 @Mod(CuriousArmorStands.MOD_ID)
 public class CuriousArmorStands {
 
-    public static final String MOD_ID = "curious_armor_stands";
+    public static final String MOD_ID = "curiousarmorstands";
 
+    // use the default `curio` slot to avoid issues
     public static final String SLOT = "curio";
+    public static final Set<String> HAND_SLOTS = Set.of("hands", "ring", "bracelet");
 
     public static final ResourceLocation ATTRIBUTE_MODIFIER_ID = ResourceLocation.fromNamespaceAndPath(MOD_ID, "slots");
 
@@ -78,6 +81,7 @@ public class CuriousArmorStands {
     @EventBusSubscriber(modid = CuriousArmorStands.MOD_ID)
     public static class Events {
 
+        // avoid changing the slot count of `curio`, since this would affect players as well
         private static void createAttributeModifier(ArmorStand armorStand) {
             CuriosApi.getCuriosInventory(armorStand)
                     .flatMap(inv -> inv.getStacksHandler(SLOT))
@@ -183,7 +187,7 @@ public class CuriousArmorStands {
 
         private static void enableArmorStandArms(ArmorStand entity, ItemStack stack) {
             Set<String> slots = CuriosSlotTypes.getItemSlotTypes(stack, entity.level().isClientSide()).keySet();
-            if (slots.contains("hands") || slots.contains("ring") || slots.contains("bracelet")) {
+            if (slots.stream().anyMatch(HAND_SLOTS::contains)) {
                 entity.setShowArms(true);
             }
         }
