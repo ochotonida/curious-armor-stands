@@ -77,7 +77,7 @@ public class CuriousArmorStands {
     @EventBusSubscriber(modid = CuriousArmorStands.MOD_ID)
     public static class Events {
 
-        private static void createAttributeModifier(ArmorStand armorStand) {
+        public static void createAttributeModifier(ArmorStand armorStand) {
             CuriosApi.getCuriosInventory(armorStand)
                     .flatMap(inv -> inv.getStacksHandler(SLOT))
                     .filter(stacks -> !stacks.getModifiers().containsKey(ATTRIBUTE_MODIFIER_ID))
@@ -137,7 +137,7 @@ public class CuriousArmorStands {
                     });
         }
 
-        private static void playEquipSound(Optional<ICurio> curio, SlotContext slotContext) {
+        public static void playEquipSound(Optional<ICurio> curio, SlotContext slotContext) {
             if (curio.isPresent()) {
                 ICurio.SoundInfo soundInfo = curio.get().getEquipSound(slotContext);
                 slotContext.entity().level().playSound(
@@ -180,14 +180,14 @@ public class CuriousArmorStands {
                     });
         }
 
-        private static void enableArmorStandArms(ArmorStand entity, ItemStack stack) {
+        public static void enableArmorStandArms(ArmorStand entity, ItemStack stack) {
             Set<String> slots = CuriosApi.getItemStackSlots(stack, entity.level()).keySet();
             if (slots.contains("hands") || slots.contains("ring") || slots.contains("bracelet")) {
                 entity.setShowArms(true);
             }
         }
 
-        private static boolean canUnequipCurio(Vec3 localPos, ArmorStand entity) {
+        public static boolean canUnequipCurio(Vec3 localPos, ArmorStand entity) {
             boolean isSmall = entity.isSmall();
             double y = isSmall ? localPos.y * 2 : localPos.y;
             return !(entity.hasItemInSlot(EquipmentSlot.FEET) && y >= 0.1 && y < 0.1 + (isSmall ? 0.8 : 0.45))
